@@ -159,20 +159,68 @@ def fetch_zhihu_hot(options):
 
     print(json.dumps(items, ensure_ascii=False, indent=2))
 
+def fetch_weibo_hot(options):
+    # https://s.weibo.com/top/summary?cate=realtimehot
+    import json
+    import re
+    from bs4 import BeautifulSoup
+
+    html = get_real_browser_html('https://rebang.today/?tab=weibo')
+    soup = BeautifulSoup(html, 'html.parser')
+
+    items = []
+    seen = set()
+    for a in soup.select('a[href*="s.weibo.com/weibo?q="]'):
+        href = a.get('href', '')
+        if not href or href in seen:
+            continue
+        seen.add(href)
+
+        row_text = a.get_text(separator='|', strip=True)
+        parts = [part.strip() for part in row_text.split('|') if part.strip()]
+        if len(parts) < 3:
+            continue
+
+        rank_str = parts[0] if parts[0].isdigit() else ''
+        title = parts[1] if len(parts) > 1 else ''
+        tag = ''
+        heat = ''
+
+        for part in parts[2:]:
+            if part.startswith('热度值：'):
+                heat = part
+            else:
+                tag = part
+
+        heat_value = ''
+        if heat:
+            heat_match = re.search(r'热度值：\s*(\d+)', heat)
+            if heat_match:
+                heat_value = heat_match.group(1)
+
+        items.append({
+            'rank': int(rank_str) if rank_str else len(items) + 1,
+            'title': title,
+            'url': href,
+            'heat': heat,
+            'heat_value': heat_value,
+            'tag': tag,
+            'source': '微博热搜',
+            'time': 'Real-time',
+        })
+
+    print(json.dumps(items, ensure_ascii=False, indent=2))
+
 def main():
     options = usage()
     if options.source == '':
         print('please provide source', file=sys.stderr)
         sys.exit(-1)
-    support_sources = set(['xiaohongshu_hot', 'zhihu_hot'])
+    support_sources = set(['xiaohongshu_hot', 'zhihu_hot', 'weibo_hot'])
     if options.source not in support_sources:
         print('unsupported source: %s' % options.source, file=sys.stderr)
         sys.exit(-1)
-
-    if options.source == 'xiaohongshu_hot':
-        fetch_xiaohongshu_hot(options)
-    elif options.source == 'zhihu_hot':
-        fetch_zhihu_hot(options)
+    exec('fetch_%s(options)' % options.source)
 
 if __name__ == '__main__':
     main()
