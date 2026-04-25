@@ -355,12 +355,71 @@ def fetch_sohu_news(options):
         })
     print(json.dumps(items, ensure_ascii=False, indent=2))
 
+# 澎湃新闻
+def fetch_thepaper(options):
+    # https://m.thepaper.cn/
+    import json
+    from bs4 import BeautifulSoup
+    html = get_real_browser_html('https://m.thepaper.cn/')
+    soup = BeautifulSoup(html, 'html.parser')
+
+    items = []
+    seen = set()
+
+    # 轮播头条
+    for item in soup.select('div.adm-swiper-item'):
+        a = item.select_one('a[href*="/newsDetail_forward_"]')
+        if not a:
+            continue
+        href = a.get('href', '').split('?')[0]
+        if href in seen:
+            continue
+        title_node = item.select_one('[class*="headline_swpier_title"] span')
+        title = title_node.get_text(strip=True) if title_node else ''
+        if not title:
+            continue
+        seen.add(href)
+        items.append({
+            'rank': len(items) + 1,
+            'title': title,
+            'url': 'https://www.thepaper.cn' + href,
+            'source': '澎湃新闻',
+            'section': '头条',
+        })
+
+    # 主列表
+    for wrapper in soup.select('div[class*="wrapper"]'):
+        a = wrapper.select_one('a[href*="/newsDetail_forward_"]')
+        if not a:
+            continue
+        href = a.get('href', '').split('?')[0]
+        if href in seen:
+            continue
+        h3 = wrapper.select_one('h3[class*="title"]')
+        title = h3.get_text(strip=True) if h3 else ''
+        if not title:
+            img = wrapper.select_one('img[alt]')
+            title = img.get('alt', '').strip() if img else ''
+        if not title:
+            continue
+        seen.add(href)
+        items.append({
+            'rank': len(items) + 1,
+            'title': title,
+            'url': 'https://www.thepaper.cn' + href,
+            'source': '澎湃新闻',
+            'section': '要闻',
+        })
+
+    print(json.dumps(items, ensure_ascii=False, indent=2))
+
+
 def main():
     options = usage()
     if options.source == '':
         print('please provide source', file=sys.stderr)
         sys.exit(-1)
-    support_sources = set(['xiaohongshu_hot', 'zhihu_hot', 'weibo_hot', 'tencent_news', '163_news', 'sohu_news'])
+    support_sources = set(['xiaohongshu_hot', 'zhihu_hot', 'weibo_hot', 'tencent_news', '163_news', 'sohu_news', 'thepaper'])
     if options.source not in support_sources:
         print('unsupported source: %s' % options.source, file=sys.stderr)
         sys.exit(-1)

@@ -73,12 +73,7 @@ metadata:
 - 腾讯新闻：https://news.qq.com/
 - 网易新闻：https://news.163.com/
 - 搜狐新闻：https://news.sohu.com/
-- 新浪新闻：https://news.sina.com.cn/
 - 澎湃新闻：https://www.thepaper.cn/
-- 人民网：http://www.people.com.cn/
-- 新华网：http://www.news.cn/
-- 央视新闻：https://news.cctv.com/
-- 中国新闻网：https://www.chinanews.com.cn/
 - Google News：https://news.google.com/
 - Bing News：https://www.bing.com/news
 
