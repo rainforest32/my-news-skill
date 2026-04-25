@@ -278,13 +278,55 @@ def fetch_tencent_news(options):
 
     print(json.dumps(items, ensure_ascii=False, indent=2))
 
+def fetch_163_news(options):
+    # https://m.163.com/touch/news
+    import json
+    from bs4 import BeautifulSoup
+
+    html = get_real_browser_html('https://m.163.com/touch/news')
+    soup = BeautifulSoup(html, 'html.parser')
+
+    items = []
+    seen = set()
+    for art in soup.select('article'):
+        parent_a = art.find_parent('a')
+        if not parent_a:
+            continue
+        href = parent_a.get('href', '').strip()
+        if not href or href in seen:
+            continue
+        if href.startswith('/'):
+            href = 'https://www.163.com' + href
+        seen.add(href)
+
+        h4 = art.select_one('h4')
+        title = h4.get_text(strip=True) if h4 else ''
+        if not title:
+            continue
+
+        source_node = art.select_one('.s-source')
+        reply_node = art.select_one('.s-replyCount')
+
+        items.append({
+            'rank': len(items) + 1,
+            'title': title,
+            'url': href,
+            'source_name': source_node.get_text(strip=True) if source_node else '',
+            'reply_count': reply_node.get_text(strip=True) if reply_node else '',
+            'source': '网易新闻',
+            'section': '要闻',
+            'time': 'Real-time',
+        })
+
+    print(json.dumps(items, ensure_ascii=False, indent=2))
+
 
 def main():
     options = usage()
     if options.source == '':
         print('please provide source', file=sys.stderr)
         sys.exit(-1)
-    support_sources = set(['xiaohongshu_hot', 'zhihu_hot', 'weibo_hot', 'tencent_news'])
+    support_sources = set(['xiaohongshu_hot', 'zhihu_hot', 'weibo_hot', 'tencent_news', '163_news'])
     if options.source not in support_sources:
         print('unsupported source: %s' % options.source, file=sys.stderr)
         sys.exit(-1)
