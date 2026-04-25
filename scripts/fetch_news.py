@@ -320,13 +320,47 @@ def fetch_163_news(options):
 
     print(json.dumps(items, ensure_ascii=False, indent=2))
 
+def fetch_sohu_news(options):
+    # https://m.sohu.com/limit/
+    import json
+    from bs4 import BeautifulSoup
+    from urllib.parse import urlparse, urlunparse
+
+    html = get_real_browser_html('https://m.sohu.com/limit/')
+    soup = BeautifulSoup(html, 'html.parser')
+
+    section = soup.select_one('section[data-spm="fd-important"]')
+    items = []
+    seen = set()
+    for rank, div in enumerate(section.select('div.f'), start=1):
+        a = div.select_one('a[href*="sohu.com/a/"]')
+        if not a:
+            continue
+        href = a.get('href', '')
+        # strip query params
+        parsed = urlparse(href)
+        url = urlunparse(parsed._replace(query='', fragment=''))
+        if url in seen:
+            continue
+        seen.add(url)
+        title = a.get_text(strip=True)
+        if not title:
+            continue
+        items.append({
+            'rank': rank,
+            'title': title,
+            'url': url,
+            'source': 'sohu_news',
+            'section': '要闻',
+        })
+    print(json.dumps(items, ensure_ascii=False, indent=2))
 
 def main():
     options = usage()
     if options.source == '':
         print('please provide source', file=sys.stderr)
         sys.exit(-1)
-    support_sources = set(['xiaohongshu_hot', 'zhihu_hot', 'weibo_hot', 'tencent_news', '163_news'])
+    support_sources = set(['xiaohongshu_hot', 'zhihu_hot', 'weibo_hot', 'tencent_news', '163_news', 'sohu_news'])
     if options.source not in support_sources:
         print('unsupported source: %s' % options.source, file=sys.stderr)
         sys.exit(-1)
