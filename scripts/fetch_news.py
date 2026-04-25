@@ -849,53 +849,256 @@ def fetch_geekpark(options):
 # https://www.reuters.com/world/
 def fetch_reuters(options):
     import json
-    from bs4 import BeautifulSoup
+    import urllib.request
+    import xml.etree.ElementTree as ET
 
-    html = get_real_browser_html('https://www.reuters.com/world/')
-    soup = BeautifulSoup(html, 'html.parser')
+    # Reuters blocks direct access; use Google News RSS search for reuters.com articles
+    url = 'https://news.google.com/rss/search?q=site:reuters.com&hl=en-US&gl=US&ceid=US:en'
+    ua = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+    req = urllib.request.Request(url, headers={'User-Agent': ua})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        body = r.read()
+    root = ET.fromstring(body)
+    seen = set()
+    items = []
+    for it in root.findall('.//item'):
+        title_el = it.find('title')
+        link_el = it.find('link')
+        pub_el = it.find('pubDate')
+        if title_el is None:
+            continue
+        title = title_el.text or ''
+        # Strip " - Reuters" suffix added by Google News
+        if title.endswith(' - Reuters'):
+            title = title[:-len(' - Reuters')]
+        link = (link_el.tail or (link_el.text if link_el is not None else '')) or ''
+        link = link.strip()
+        if not title or not link or link in seen:
+            continue
+        seen.add(link)
+        pub = pub_el.text if pub_el is not None else ''
+        items.append({
+            'rank': len(items) + 1,
+            'title': title,
+            'url': link,
+            'time': pub,
+            'source': 'Reuters',
+        })
+    print(json.dumps(items, ensure_ascii=False, indent=2))
 
 # bbc
 # https://www.bbc.com/news
 def fetch_bbc(options):
     import json
-    from bs4 import BeautifulSoup
+    import urllib.request
+    import xml.etree.ElementTree as ET
 
-    html = get_real_browser_html('https://www.bbc.com/news')
-    soup = BeautifulSoup(html, 'html.parser')
+    url = 'https://feeds.bbci.co.uk/news/world/rss.xml'
+    ua = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+    req = urllib.request.Request(url, headers={'User-Agent': ua})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        body = r.read()
+    root = ET.fromstring(body)
+    seen = set()
+    items = []
+    for it in root.findall('.//item'):
+        title_el = it.find('title')
+        link_el = it.find('link')
+        desc_el = it.find('description')
+        pub_el = it.find('pubDate')
+        if title_el is None:
+            continue
+        title = title_el.text or ''
+        link = (link_el.text or '') if link_el is not None else ''
+        # Strip RSS tracking params
+        if '?' in link:
+            link = link.split('?')[0]
+        link = link.strip()
+        if not title or not link or link in seen:
+            continue
+        seen.add(link)
+        desc = (desc_el.text or '') if desc_el is not None else ''
+        pub = pub_el.text if pub_el is not None else ''
+        items.append({
+            'rank': len(items) + 1,
+            'title': title,
+            'url': link,
+            'description': desc,
+            'time': pub,
+            'source': 'BBC',
+        })
+    print(json.dumps(items, ensure_ascii=False, indent=2))
 
 # cnn
 # https://edition.cnn.com/world
 def fetch_cnn(options):
     import json
+    import urllib.request
     from bs4 import BeautifulSoup
 
-    html = get_real_browser_html('https://edition.cnn.com/world')
+    ua = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+    req = urllib.request.Request('https://edition.cnn.com/world',
+        headers={'User-Agent': ua, 'Accept-Language': 'en-US,en;q=0.9'})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        html = r.read().decode('utf-8', errors='replace')
     soup = BeautifulSoup(html, 'html.parser')
+
+    seen = set()
+    items = []
+    for card in soup.select('li.card.container__item'):
+        link = card.select_one('a.container__link[href]')
+        if not link:
+            continue
+        href = link.get('href', '').strip()
+        if not href or 'live-news' in href:
+            continue
+        if not href.startswith('http'):
+            href = 'https://edition.cnn.com' + href
+        if href in seen:
+            continue
+        headline = card.select_one('.container__headline-text')
+        title = headline.get_text(strip=True) if headline else ''
+        if not title:
+            continue
+        seen.add(href)
+        items.append({
+            'rank': len(items) + 1,
+            'title': title,
+            'url': href,
+            'source': 'CNN',
+        })
+    print(json.dumps(items, ensure_ascii=False, indent=2))
 
 # apnews
 # https://apnews.com/world-news
 def fetch_apnews(options):
     import json
+    import urllib.request
+    import datetime
     from bs4 import BeautifulSoup
 
-    html = get_real_browser_html('https://apnews.com/world-news')
+    ua = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+    req = urllib.request.Request('https://apnews.com/world-news',
+        headers={'User-Agent': ua, 'Accept-Language': 'en-US,en;q=0.9'})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        html = r.read().decode('utf-8', errors='replace')
     soup = BeautifulSoup(html, 'html.parser')
+
+    seen = set()
+    items = []
+    for card in soup.select('div.PagePromo'):
+        link = card.select_one('a.Link[href*="/article/"]')
+        if not link:
+            continue
+        href = link.get('href', '').strip()
+        if not href or href in seen:
+            continue
+        title_el = card.select_one('.PagePromo-title')
+        title = title_el.get_text(strip=True) if title_el else ''
+        if not title:
+            continue
+        seen.add(href)
+        desc_el = card.select_one('.PagePromo-description')
+        description = desc_el.get_text(strip=True) if desc_el else ''
+        ts_ms = card.get('data-posted-date-timestamp', '')
+        time_str = ''
+        if ts_ms:
+            try:
+                dt = datetime.datetime.fromtimestamp(int(ts_ms) / 1000, datetime.timezone.utc)
+                time_str = dt.strftime('%Y-%m-%d %H:%M UTC')
+            except Exception:
+                pass
+        items.append({
+            'rank': len(items) + 1,
+            'title': title,
+            'url': href,
+            'description': description,
+            'time': time_str,
+            'source': 'AP News',
+        })
+    print(json.dumps(items, ensure_ascii=False, indent=2))
 
 # 纽约时报
 # https://www.nytimes.com/section/world
 def fetch_nytimes(options):
     import json
+    import urllib.request
+    import xml.etree.ElementTree as ET
+
+    url = 'https://rss.nytimes.com/services/xml/rss/nyt/World.xml'
+    ua = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+    req = urllib.request.Request(url, headers={'User-Agent': ua})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        body = r.read()
+    root = ET.fromstring(body)
+    seen = set()
+    items = []
+    for it in root.findall('.//item'):
+        title_el = it.find('title')
+        link_el = it.find('link')
+        desc_el = it.find('description')
+        pub_el = it.find('pubDate')
+        cat_el = it.find('category')
+        if title_el is None:
+            continue
+        title = title_el.text or ''
+        link = (link_el.text or '') if link_el is not None else ''
+        if not link and link_el is not None:
+            link = link_el.tail or ''
+        link = link.strip()
+        if not title or not link or link in seen:
+            continue
+        seen.add(link)
+        desc = (desc_el.text or '') if desc_el is not None else ''
+        pub = pub_el.text if pub_el is not None else ''
+        cat = (cat_el.text or '') if cat_el is not None else ''
+        items.append({
+            'rank': len(items) + 1,
+            'title': title,
+            'url': link,
+            'description': desc,
+            'category': cat,
+            'time': pub,
+            'source': 'NYTimes',
+        })
+    print(json.dumps(items, ensure_ascii=False, indent=2))
+
+# Hugging Face Papers
+# https://huggingface.co/papers
+def fetch_hf_papers(options):
+    import json
     from bs4 import BeautifulSoup
 
-    html = get_real_browser_html('https://www.nytimes.com/section/world')
+    html = get_real_browser_html('https://huggingface.co/papers')
     soup = BeautifulSoup(html, 'html.parser')
+
+# Hacker News
+# https://news.ycombinator.com/
+def fetch_hackernews(options):
+    import json
+    from bs4 import BeautifulSoup
+
+    html = get_real_browser_html('https://news.ycombinator.com/')
+    soup = BeautifulSoup(html, 'html.parser')
+
+# github trending
+# https://github.com/trending?since=weekly
+def fetch_github_trending(options):
+    import json
+    from bs4 import BeautifulSoup
+
+    html = get_real_browser_html('https://github.com/trending?since=weekly')
+    soup = BeautifulSoup(html, 'html.parser')
+
+
+
 
 def main():
     options = usage()
     if options.source == '':
         print('please provide source', file=sys.stderr)
         sys.exit(-1)
-    support_sources = set(['xiaohongshu_hot', 'zhihu_hot', 'weibo_hot', 'tencent_news', '163_news', 'sohu_news', 'thepaper', 'google_news', 'wallstreetcn', 'yicai', 'cls', 'stcn', '36kr', 'tencent_tech', 'tmtpost', 'geekpark'])
+    support_sources = set(['xiaohongshu_hot', 'zhihu_hot', 'weibo_hot', 'tencent_news', '163_news', 'sohu_news', 'thepaper', 'google_news', 'wallstreetcn', 'yicai', 'cls', 'stcn', '36kr', 'tencent_tech', 'tmtpost', 'geekpark', 'reuters', 'bbc', 'cnn', 'apnews', 'nytimes'])
     if options.source not in support_sources:
         print('unsupported source: %s' % options.source, file=sys.stderr)
         sys.exit(-1)

@@ -104,14 +104,11 @@ metadata:
 
 ### 热点与社交平台
 - 微博热搜：https://s.weibo.com/top/summary
-- 百度热搜：https://top.baidu.com/
 - 知乎热榜：https://www.zhihu.com/hot
 - 小红书热榜：https://rebang.today/?tab=xiaohongshu（官方https://www.xiaohongshu.com/没有提供热榜功能）
 
 ### AI 与开发者资讯
 - Hugging Face Papers：https://huggingface.co/papers
-- OpenAI Blog：https://openai.com/news/
-- Anthropic News：https://www.anthropic.com/news
 - Hacker News：https://news.ycombinator.com/
 - GitHub Trending：https://github.com/trending
 
