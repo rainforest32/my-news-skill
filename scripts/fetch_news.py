@@ -211,12 +211,82 @@ def fetch_weibo_hot(options):
 
     print(json.dumps(items, ensure_ascii=False, indent=2))
 
+def fetch_tencent_news(options):
+    # https://news.qq.com
+    import json
+    from bs4 import BeautifulSoup
+
+    test_html_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'test.html')
+    with open(test_html_path, 'r', encoding='utf-8') as fp:
+        html = fp.read()
+
+    soup = BeautifulSoup(html, 'html.parser')
+
+    items = []
+
+    featured_rank = 0
+    for card in soup.select('.channel-hot-item'):
+        article_link = card.select_one('a.article-base-info[href]')
+        if not article_link:
+            continue
+
+        title_node = card.select_one('.article-title-text')
+        title = title_node.get_text(strip=True) if title_node else ''
+        if not title:
+            continue
+
+        tag_node = card.select_one('.qqcom-article-tag .tag-wrap')
+        media_node = card.select_one('.author-info .media-name span')
+        time_node = card.select_one('.author-info .time')
+
+        featured_rank += 1
+        items.append({
+            'section': '热点精选',
+            'rank': featured_rank,
+            'title': title,
+            'url': article_link.get('href', ''),
+            'source_name': media_node.get_text(strip=True) if media_node else '',
+            'time': time_node.get_text(strip=True) if time_node else '',
+            'tag': tag_node.get_text(strip=True) if tag_node else '',
+            'source': '腾讯新闻',
+        })
+
+    normal_rank = 0
+    for card in soup.select('.channel-feed-item'):
+        article_link = card.select_one('a.article-title[href]')
+        if not article_link:
+            continue
+
+        title_node = card.select_one('.article-title-text')
+        title = title_node.get_text(strip=True) if title_node else ''
+        if not title:
+            continue
+
+        media_node = card.select_one('.article-media .media-name span')
+        time_node = card.select_one('.article-media .time')
+        comment_node = card.select_one('a.article-comment')
+
+        normal_rank += 1
+        items.append({
+            'section': '普通新闻',
+            'rank': normal_rank,
+            'title': title,
+            'url': article_link.get('href', ''),
+            'source_name': media_node.get_text(strip=True) if media_node else '',
+            'time': time_node.get_text(strip=True) if time_node else '',
+            'comment_count': comment_node.get_text(strip=True) if comment_node else '',
+            'source': '腾讯新闻',
+        })
+
+    print(json.dumps(items, ensure_ascii=False, indent=2))
+
+
 def main():
     options = usage()
     if options.source == '':
         print('please provide source', file=sys.stderr)
         sys.exit(-1)
-    support_sources = set(['xiaohongshu_hot', 'zhihu_hot', 'weibo_hot'])
+    support_sources = set(['xiaohongshu_hot', 'zhihu_hot', 'weibo_hot', 'tencent_news'])
     if options.source not in support_sources:
         print('unsupported source: %s' % options.source, file=sys.stderr)
         sys.exit(-1)
