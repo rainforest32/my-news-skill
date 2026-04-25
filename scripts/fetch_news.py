@@ -70,7 +70,6 @@ def get_real_browser_html(url):
         try:
             page.goto(url, wait_until="networkidle", timeout=30000)
         except TimeoutError:
-            print("页面加载超时，但还继续操作", file=sys.stderr)
             pass
         
         # 获取渲染后完整HTML
