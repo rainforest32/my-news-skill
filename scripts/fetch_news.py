@@ -216,9 +216,7 @@ def fetch_tencent_news(options):
     import json
     from bs4 import BeautifulSoup
 
-    test_html_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'test.html')
-    with open(test_html_path, 'r', encoding='utf-8') as fp:
-        html = fp.read()
+    html = get_real_browser_html('https://news.qq.com')
 
     soup = BeautifulSoup(html, 'html.parser')
 
