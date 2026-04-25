@@ -75,7 +75,6 @@ metadata:
 - 搜狐新闻：https://news.sohu.com/
 - 澎湃新闻：https://www.thepaper.cn/
 - Google News：https://news.google.com/
-- Bing News：https://www.bing.com/news
 
 ### 财经新闻
 - 华尔街见闻：https://wallstreetcn.com/

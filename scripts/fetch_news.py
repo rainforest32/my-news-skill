@@ -51,7 +51,7 @@ def get_real_browser_html(url):
         browser.close()
         return html
 
-
+# 小红书热点
 def fetch_xiaohongshu_hot(options):
     # https://rebang.today/?tab=xiaohongshu
     import json
@@ -94,6 +94,7 @@ def fetch_xiaohongshu_hot(options):
 
     print(json.dumps(items, ensure_ascii=False, indent=2))
 
+# 知乎热点
 def fetch_zhihu_hot(options):
     # https://rebang.today/?tab=zhihu
     import json
@@ -159,6 +160,7 @@ def fetch_zhihu_hot(options):
 
     print(json.dumps(items, ensure_ascii=False, indent=2))
 
+# 微博热点
 def fetch_weibo_hot(options):
     # https://s.weibo.com/top/summary?cate=realtimehot
     import json
@@ -211,6 +213,7 @@ def fetch_weibo_hot(options):
 
     print(json.dumps(items, ensure_ascii=False, indent=2))
 
+# 腾讯新闻
 def fetch_tencent_news(options):
     # https://news.qq.com
     import json
@@ -278,6 +281,7 @@ def fetch_tencent_news(options):
 
     print(json.dumps(items, ensure_ascii=False, indent=2))
 
+# 网易新闻
 def fetch_163_news(options):
     # https://m.163.com/touch/news
     import json
@@ -320,6 +324,7 @@ def fetch_163_news(options):
 
     print(json.dumps(items, ensure_ascii=False, indent=2))
 
+# 搜狐新闻
 def fetch_sohu_news(options):
     # https://m.sohu.com/limit/
     import json
@@ -413,6 +418,7 @@ def fetch_thepaper(options):
 
     print(json.dumps(items, ensure_ascii=False, indent=2))
 
+# Google新闻
 def fetch_google_news(options):
     # https://news.google.com/topics/CAAqKggKIiRDQkFTRlFvSUwyMHZNRFZxYUdjU0JYcG9MVU5PR2dKRFRpZ0FQAQ?hl=zh-CN&gl=CN&ceid=CN%3Azh-Hans
     import json
@@ -465,13 +471,89 @@ def fetch_google_news(options):
 
     print(json.dumps(items, ensure_ascii=False, indent=2))
 
+# 华尔街见闻
+# https://wallstreetcn.com/news/global
+def fetch_wallstreetcn(options):
+    import json
+    from bs4 import BeautifulSoup
+    html = get_real_browser_html('https://wallstreetcn.com/news/global')
+    soup = BeautifulSoup(html, 'html.parser')
+
+    items = []
+    seen = set()
+    for card in soup.select('div.article-entry.list-item'):
+        a = card.select_one('a.article-link[href*="/articles/"]')
+        if not a:
+            continue
+        href = a.get('href', '').split('?')[0]
+        if href in seen:
+            continue
+        title = a.get_text(strip=True)
+        if not title:
+            continue
+        seen.add(href)
+        desc_node = card.select_one('div.content')
+        author_node = card.select_one('div.author')
+        time_node = card.select_one('time')
+        items.append({
+            'rank': len(items) + 1,
+            'title': title,
+            'url': href,
+            'description': desc_node.get_text(strip=True) if desc_node else '',
+            'author': author_node.get_text(strip=True) if author_node else '',
+            'time': time_node.get('datetime', '') if time_node else '',
+            'source': '华尔街见闻',
+            'section': '全球',
+        })
+    print(json.dumps(items, ensure_ascii=False, indent=2))
+
+# 第一财经
+# https://www.yicai.com/news/
+def fetch_yicai(options):
+    import json
+    import re
+    from bs4 import BeautifulSoup
+    html = get_real_browser_html('https://www.yicai.com/news/')
+    soup = BeautifulSoup(html, 'html.parser')
+
+    items = []
+    seen = set()
+    newslist = soup.select_one('#newslist')
+    if not newslist:
+        newslist = soup
+    for a in newslist.select('a.f-db[href]'):
+        href = a.get('href', '')
+        if not re.search(r'/news/\d+', href):
+            continue
+        if not href.startswith('http'):
+            href = 'https://www.yicai.com' + href
+        href = href.split('?')[0]
+        if href in seen:
+            continue
+        h2 = a.select_one('h2')
+        title = h2.get_text(strip=True) if h2 else ''
+        if not title:
+            continue
+        seen.add(href)
+        desc_node = a.select_one('p')
+        time_node = a.select_one('.rightspan span')
+        items.append({
+            'rank': len(items) + 1,
+            'title': title,
+            'url': href,
+            'description': desc_node.get_text(strip=True) if desc_node else '',
+            'time': time_node.get_text(strip=True) if time_node else '',
+            'source': '第一财经',
+            'section': '新闻',
+        })
+    print(json.dumps(items, ensure_ascii=False, indent=2))
 
 def main():
     options = usage()
     if options.source == '':
         print('please provide source', file=sys.stderr)
         sys.exit(-1)
-    support_sources = set(['xiaohongshu_hot', 'zhihu_hot', 'weibo_hot', 'tencent_news', '163_news', 'sohu_news', 'thepaper', 'google_news'])
+    support_sources = set(['xiaohongshu_hot', 'zhihu_hot', 'weibo_hot', 'tencent_news', '163_news', 'sohu_news', 'thepaper', 'google_news', 'wallstreetcn', 'yicai'])
     if options.source not in support_sources:
         print('unsupported source: %s' % options.source, file=sys.stderr)
         sys.exit(-1)
