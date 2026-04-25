@@ -80,8 +80,7 @@ metadata:
 | 财经新闻 | `wallstreetcn`, `cls`, `yicai` | `stcn` |
 | 科技新闻 | `36kr`, `geekpark`, `tmtpost`, `tencent_tech` | - |
 | 国际新闻 | `reuters`, `bbc`, `nytimes` | `cnn`, `apnews` |
-| AI 论文 | `hf_papers` | `hackernews` |
-| AI / 开发者动态 | `hackernews`, `hf_papers`, `github_trending`, `36kr` | - |
+| AI新闻 | `hackernews`, `hf_papers`, `github_trending`, `36kr` | - |
 | GitHub 热门项目 | `github_trending` | `hackernews` |
 
 ## 工作流
