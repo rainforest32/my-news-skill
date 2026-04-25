@@ -94,19 +94,85 @@ def fetch_xiaohongshu_hot(options):
 
     print(json.dumps(items, ensure_ascii=False, indent=2))
 
+def fetch_zhihu_hot(options):
+    # https://rebang.today/?tab=zhihu
+    import json
+    import re
+    from bs4 import BeautifulSoup
+
+    html = get_real_browser_html('https://rebang.today/?tab=zhihu')
+    soup = BeautifulSoup(html, 'html.parser')
+
+    items = []
+    seen = set()
+    # 空文本锚点的 parent 包含完整行信息: rank|[tag]|title|title|desc|XX万热度
+    for a in soup.select('a[href*="zhihu.com/question"]'):
+        href = a.get('href', '')
+        if href in seen:
+            continue
+        if a.get_text(strip=True):
+            continue  # 跳过带文本的链接，用空链接的 parent 取完整行
+        seen.add(href)
+
+        parent = a.parent
+        row_text = parent.get_text(separator='|', strip=True) if parent else ''
+        parts = [p.strip() for p in row_text.split('|') if p.strip()]
+        if not parts:
+            continue
+
+        # 热度: 最后一个元素包含 "万热度"
+        heat = ''
+        if parts and '万热度' in parts[-1]:
+            heat = parts[-1]
+
+        # 排名: 第一个数字
+        rank_str = parts[0] if parts[0].isdigit() else ''
+
+        # 标签: 第二个元素可能是 "新"/"热"/"荐" 等短标签
+        tag = ''
+        title_start = 1
+        if len(parts) > 1 and len(parts[1]) <= 2 and not parts[1][0].isdigit():
+            tag = parts[1]
+            title_start = 2
+
+        title = parts[title_start] if len(parts) > title_start else ''
+
+        # 摘要: title 之后、heat 之前的非重复文本
+        desc = ''
+        if len(parts) > title_start + 2:
+            # parts: ...title, title_dup, desc_text, heat
+            desc_parts = parts[title_start + 1:-1]
+            # 去掉与 title 重复的部分
+            desc_parts = [p for p in desc_parts if p != title]
+            desc = ' '.join(desc_parts).strip()
+
+        items.append({
+            'rank': int(rank_str) if rank_str else len(items) + 1,
+            'title': title,
+            'url': href,
+            'heat': heat,
+            'tag': tag,
+            'description': desc[:200] if desc else '',
+            'source': '知乎热榜',
+            'time': 'Real-time',
+        })
+
+    print(json.dumps(items, ensure_ascii=False, indent=2))
 
 def main():
     options = usage()
     if options.source == '':
         print('please provide source', file=sys.stderr)
         sys.exit(-1)
-    support_sources = set(['xiaohongshu_hot'])
+    support_sources = set(['xiaohongshu_hot', 'zhihu_hot'])
     if options.source not in support_sources:
         print('unsupported source: %s' % options.source, file=sys.stderr)
         sys.exit(-1)
 
     if options.source == 'xiaohongshu_hot':
         fetch_xiaohongshu_hot(options)
+    elif options.source == 'zhihu_hot':
+        fetch_zhihu_hot(options)
 
 if __name__ == '__main__':
     main()
