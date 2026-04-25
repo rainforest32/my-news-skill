@@ -21,6 +21,28 @@ def usage():
     (options, _) = parser.parse_args()
     return options
 
+def parse_cn_relative_time(text):
+    """将中文相对时间（如 '1小时前'）转换为绝对时间字符串。"""
+    import re
+    now = datetime.datetime.now()
+    text = text.strip()
+    if not text:
+        return ''
+    if '刚刚' in text:
+        return now.strftime('%Y-%m-%d %H:%M')
+    m = re.search(r'(\d+)\s*分钟前', text)
+    if m:
+        return (now - datetime.timedelta(minutes=int(m.group(1)))).strftime('%Y-%m-%d %H:%M')
+    m = re.search(r'(\d+)\s*小时前', text)
+    if m:
+        return (now - datetime.timedelta(hours=int(m.group(1)))).strftime('%Y-%m-%d %H:%M')
+    m = re.search(r'(\d+)\s*天前', text)
+    if m:
+        return (now - datetime.timedelta(days=int(m.group(1)))).strftime('%Y-%m-%d')
+    if '昨天' in text:
+        return (now - datetime.timedelta(days=1)).strftime('%Y-%m-%d')
+    return text
+
 def get_real_browser_html(url):
     from playwright.sync_api import sync_playwright
     with sync_playwright() as p:
@@ -364,9 +386,39 @@ def fetch_sohu_news(options):
 def fetch_thepaper(options):
     # https://m.thepaper.cn/
     import json
+    import re
     from bs4 import BeautifulSoup
     html = get_real_browser_html('https://m.thepaper.cn/')
     soup = BeautifulSoup(html, 'html.parser')
+
+    # 从 __NEXT_DATA__ JSON 提取 contId -> pubTime 映射
+    pub_time_map = {}
+    next_data_tag = soup.select_one('script#__NEXT_DATA__')
+    if next_data_tag:
+        try:
+            nd = json.loads(next_data_tag.string or '')
+            page_props = nd.get('props', {}).get('pageProps', {})
+            # 主列表
+            for art in page_props.get('data', {}).get('list', []):
+                cid = str(art.get('contId', ''))
+                pt = art.get('pubTime', '')
+                if cid and pt:
+                    pub_time_map[cid] = pt
+            # 轮播头条 (topData.recommendImg)
+            for art in page_props.get('topData', {}).get('recommendImg', []):
+                cid = str(art.get('contId', ''))
+                pt = art.get('pubTime', '')
+                if cid and pt:
+                    pub_time_map[cid] = pt
+        except Exception:
+            pass
+
+    def get_time_for_href(href):
+        m = re.search(r'/newsDetail_forward_(\d+)', href)
+        if m:
+            raw = pub_time_map.get(m.group(1), '')
+            return parse_cn_relative_time(raw)
+        return ''
 
     items = []
     seen = set()
@@ -388,6 +440,7 @@ def fetch_thepaper(options):
             'rank': len(items) + 1,
             'title': title,
             'url': 'https://www.thepaper.cn' + href,
+            'time': get_time_for_href(href),
             'source': '澎湃新闻',
             'section': '头条',
         })
@@ -412,6 +465,7 @@ def fetch_thepaper(options):
             'rank': len(items) + 1,
             'title': title,
             'url': 'https://www.thepaper.cn' + href,
+            'time': get_time_for_href(href),
             'source': '澎湃新闻',
             'section': '要闻',
         })
