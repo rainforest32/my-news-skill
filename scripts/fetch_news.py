@@ -548,12 +548,354 @@ def fetch_yicai(options):
         })
     print(json.dumps(items, ensure_ascii=False, indent=2))
 
+# 财联社
+# https://www.cls.cn/depth?id=1000
+def fetch_cls(options):
+    import json
+    import time
+    import urllib.request
+
+    api_url = (
+        'https://www.cls.cn/v3/depth/home/assembled/1000'
+        '?app=CailianpressWeb&os=web&sv=8.4.6'
+        '&sign=9f8797a1f4de66c2370f7a03990d2737'
+    )
+    req = urllib.request.Request(api_url, headers={
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://www.cls.cn/depth?id=1000',
+        'Accept': 'application/json, text/plain, */*',
+    })
+    with urllib.request.urlopen(req, timeout=20) as r:
+        data = json.loads(r.read().decode('utf-8'))
+
+    d = data.get('data', {})
+    top_articles = d.get('top_article', [])
+    depth_list = d.get('depth_list', [])
+
+    seen = set()
+    items = []
+    for article in top_articles + depth_list:
+        aid = article.get('id')
+        if not aid or aid in seen:
+            continue
+        seen.add(aid)
+        title = article.get('title', '').strip()
+        if not title:
+            continue
+        url = 'https://www.cls.cn/detail/%d' % aid
+        brief = article.get('brief', '').strip()
+        author = article.get('author', article.get('source', '')).strip()
+        ctime = article.get('ctime', 0)
+        pub_time = time.strftime('%Y-%m-%d %H:%M', time.localtime(ctime)) if ctime else ''
+        items.append({
+            'title': title,
+            'url': url,
+            'desc': brief,
+            'author': author,
+            'time': pub_time,
+        })
+
+    print(json.dumps(items, ensure_ascii=False, indent=2))
+
+# 证券时报
+# https://www.stcn.com/article/list/yw.html
+def fetch_stcn(options):
+    import json
+    from bs4 import BeautifulSoup
+    html = get_real_browser_html('https://www.stcn.com/article/list/yw.html')
+    soup = BeautifulSoup(html, 'html.parser')
+
+    items = []
+    seen = set()
+    for li in soup.select('ul.list.infinite-list > li'):
+        content = li.select_one('div.content')
+        if not content:
+            continue
+        a = content.select_one('div.tt a[href]')
+        if not a:
+            continue
+        href = a.get('href', '').strip()
+        if not href.startswith('http'):
+            href = 'https://www.stcn.com' + href
+        href = href.split('?')[0]
+        if href in seen:
+            continue
+        title = a.get_text(strip=True)
+        if not title:
+            continue
+        seen.add(href)
+        desc_a = content.select_one('div.text a')
+        desc = desc_a.get_text(strip=True) if desc_a else ''
+        # desc sometimes repeats title at start
+        if desc.startswith(title):
+            desc = desc[len(title):].strip()
+        info_spans = content.select('div.info span')
+        source_name = info_spans[0].get_text(strip=True) if len(info_spans) > 0 else ''
+        pub_time = info_spans[-1].get_text(strip=True) if len(info_spans) > 1 else ''
+        items.append({
+            'rank': len(items) + 1,
+            'title': title,
+            'url': href,
+            'description': desc[:200],
+            'source_name': source_name,
+            'time': pub_time,
+            'source': '证券时报',
+            'section': '要闻',
+        })
+    print(json.dumps(items, ensure_ascii=False, indent=2))
+
+
+# 36氪
+# https://www.36kr.com/information/web_news/
+def fetch_36kr(options):
+    import json
+    from bs4 import BeautifulSoup
+    html = get_real_browser_html('https://www.36kr.com/information/web_news/')
+    soup = BeautifulSoup(html, 'html.parser')
+
+    items = []
+    seen = set()
+    for card in soup.select('div.kr-flow-article-item'):
+        a = card.select_one('a.article-item-title[href]')
+        if not a:
+            continue
+        href = a.get('href', '').strip()
+        if not href.startswith('http'):
+            href = 'https://www.36kr.com' + href
+        href = href.split('?')[0]
+        if href in seen:
+            continue
+        title = a.get_text(strip=True)
+        if not title:
+            continue
+        seen.add(href)
+        desc_node = card.select_one('a.article-item-description')
+        channel_node = card.select_one('a.article-item-channel')
+        author_node = card.select_one('a.kr-flow-bar-author')
+        time_node = card.select_one('span.kr-flow-bar-time')
+        pub_time = time_node.get_text(strip=True) if time_node else ''
+        items.append({
+            'rank': len(items) + 1,
+            'title': title,
+            'url': href,
+            'description': desc_node.get_text(strip=True) if desc_node else '',
+            'category': channel_node.get_text(strip=True) if channel_node else '',
+            'author': author_node.get_text(strip=True) if author_node else '',
+            'time': pub_time,
+            'source': '36氪',
+        })
+    print(json.dumps(items, ensure_ascii=False, indent=2))
+
+# 腾讯科技
+# https://news.qq.com/ch/tech
+def fetch_tencent_tech(options):
+    import json
+    from bs4 import BeautifulSoup
+
+    html = get_real_browser_html('https://news.qq.com/ch/tech')
+    soup = BeautifulSoup(html, 'html.parser')
+
+    items = []
+    seen = set()
+
+    for card in soup.select('.channel-hot-item'):
+        article_link = card.select_one('a.article-base-info[href]')
+        if not article_link:
+            continue
+        title_node = card.select_one('.article-title-text')
+        title = title_node.get_text(strip=True) if title_node else ''
+        if not title:
+            continue
+        href = article_link.get('href', '').split('?')[0]
+        if href in seen:
+            continue
+        seen.add(href)
+        media_node = card.select_one('.author-info .media-name span')
+        time_node = card.select_one('.author-info .time')
+        items.append({
+            'rank': len(items) + 1,
+            'title': title,
+            'url': article_link.get('href', ''),
+            'source_name': media_node.get_text(strip=True) if media_node else '',
+            'time': time_node.get_text(strip=True) if time_node else '',
+            'section': '热点',
+            'source': '腾讯科技',
+        })
+
+    for card in soup.select('.channel-feed-item'):
+        article_link = card.select_one('a.article-title[href]')
+        if not article_link:
+            continue
+        title_node = card.select_one('.article-title-text')
+        title = title_node.get_text(strip=True) if title_node else ''
+        if not title:
+            continue
+        href = article_link.get('href', '').split('?')[0]
+        if href in seen:
+            continue
+        seen.add(href)
+        media_node = card.select_one('.article-media .media-name')
+        time_node = card.select_one('.article-media .time')
+        items.append({
+            'rank': len(items) + 1,
+            'title': title,
+            'url': article_link.get('href', ''),
+            'source_name': media_node.get_text(strip=True) if media_node else '',
+            'time': time_node.get_text(strip=True) if time_node else '',
+            'section': '科技',
+            'source': '腾讯科技',
+        })
+
+    print(json.dumps(items, ensure_ascii=False, indent=2))
+
+# 钛媒体
+# https://www.tmtpost.com/new
+def fetch_tmtpost(options):
+    import json
+    from bs4 import BeautifulSoup
+
+    html = get_real_browser_html('https://www.tmtpost.com/new')
+    soup = BeautifulSoup(html, 'html.parser')
+
+    items = []
+    rank = 1
+    for card in soup.select('div.item[zgclickable]'):
+        tit = card.select_one('a._tit')
+        if not tit:
+            continue
+        title = tit.get_text(strip=True)
+        url = tit.get('href', '')
+        if not url.startswith('http'):
+            url = 'https://www.tmtpost.com' + url
+        des = card.select_one('a._des')
+        description = des.get_text(strip=True) if des else ''
+        author_el = card.select_one('div.author_box a')
+        author = author_el.get_text(strip=True) if author_el else ''
+        time_el = card.select_one('a.newTime')
+        time_str = time_el.get_text(strip=True).lstrip('· ').strip() if time_el else ''
+        items.append({
+            'rank': rank,
+            'title': title,
+            'url': url,
+            'description': description,
+            'author': author,
+            'time': time_str,
+            'source': '钛媒体',
+        })
+        rank += 1
+    print(json.dumps(items, ensure_ascii=False, indent=2))
+
+# 极客公园
+# https://www.geekpark.net/
+def fetch_geekpark(options):
+    import json
+    from bs4 import BeautifulSoup
+
+    html = get_real_browser_html('https://www.geekpark.net/')
+    soup = BeautifulSoup(html, 'html.parser')
+
+    items = []
+    rank = 1
+
+    # 头条轮播区
+    for card in soup.select('div.breaking-news div.item'):
+        a = card.select_one('a.link[href]')
+        if not a:
+            continue
+        title = a.get('data-track-title', '') or (card.select_one('h3') and card.select_one('h3').get_text(strip=True)) or ''
+        url = 'https://www.geekpark.net' + a.get('href', '')
+        desc_el = card.select_one('p.multiline-text-overflow')
+        description = desc_el.get_text(strip=True) if desc_el else ''
+        items.append({
+            'rank': rank,
+            'title': title,
+            'url': url,
+            'description': description,
+            'source': '极客公园',
+        })
+        rank += 1
+
+    # 文章列表区
+    for card in soup.select('div.article-list article.article-item'):
+        a_title = card.select_one('a[data-event-category="article-list.title"]')
+        if not a_title:
+            continue
+        h3 = a_title.select_one('h3')
+        title = h3.get_text(strip=True) if h3 else a_title.get_text(strip=True)
+        url = 'https://www.geekpark.net' + a_title.get('href', '')
+        desc_el = card.select_one('p.multiline-text-overflow')
+        description = desc_el.get_text(strip=True) if desc_el else ''
+        cat_el = card.select_one('a.category-tag')
+        category = cat_el.get_text(strip=True) if cat_el else ''
+        time_el = card.select_one('div.article-time')
+        time_str = time_el.get_text(strip=True) if time_el else ''
+        author_el = card.select_one('a.article-author')
+        author = author_el.get_text(strip=True) if author_el else ''
+        items.append({
+            'rank': rank,
+            'title': title,
+            'url': url,
+            'description': description,
+            'category': category,
+            'author': author,
+            'time': time_str,
+            'source': '极客公园',
+        })
+        rank += 1
+
+    print(json.dumps(items, ensure_ascii=False, indent=2))
+
+# reuters
+# https://www.reuters.com/world/
+def fetch_reuters(options):
+    import json
+    from bs4 import BeautifulSoup
+
+    html = get_real_browser_html('https://www.reuters.com/world/')
+    soup = BeautifulSoup(html, 'html.parser')
+
+# bbc
+# https://www.bbc.com/news
+def fetch_bbc(options):
+    import json
+    from bs4 import BeautifulSoup
+
+    html = get_real_browser_html('https://www.bbc.com/news')
+    soup = BeautifulSoup(html, 'html.parser')
+
+# cnn
+# https://edition.cnn.com/world
+def fetch_cnn(options):
+    import json
+    from bs4 import BeautifulSoup
+
+    html = get_real_browser_html('https://edition.cnn.com/world')
+    soup = BeautifulSoup(html, 'html.parser')
+
+# apnews
+# https://apnews.com/world-news
+def fetch_apnews(options):
+    import json
+    from bs4 import BeautifulSoup
+
+    html = get_real_browser_html('https://apnews.com/world-news')
+    soup = BeautifulSoup(html, 'html.parser')
+
+# 纽约时报
+# https://www.nytimes.com/section/world
+def fetch_nytimes(options):
+    import json
+    from bs4 import BeautifulSoup
+
+    html = get_real_browser_html('https://www.nytimes.com/section/world')
+    soup = BeautifulSoup(html, 'html.parser')
+
 def main():
     options = usage()
     if options.source == '':
         print('please provide source', file=sys.stderr)
         sys.exit(-1)
-    support_sources = set(['xiaohongshu_hot', 'zhihu_hot', 'weibo_hot', 'tencent_news', '163_news', 'sohu_news', 'thepaper', 'google_news', 'wallstreetcn', 'yicai'])
+    support_sources = set(['xiaohongshu_hot', 'zhihu_hot', 'weibo_hot', 'tencent_news', '163_news', 'sohu_news', 'thepaper', 'google_news', 'wallstreetcn', 'yicai', 'cls', 'stcn', '36kr', 'tencent_tech', 'tmtpost', 'geekpark'])
     if options.source not in support_sources:
         print('unsupported source: %s' % options.source, file=sys.stderr)
         sys.exit(-1)

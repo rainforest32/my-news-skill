@@ -80,24 +80,20 @@ metadata:
 - 华尔街见闻：https://wallstreetcn.com/
 - 第一财经：https://www.yicai.com/
 - 财联社：https://www.cls.cn/
-- 新浪财经：https://finance.sina.com.cn/
 - 证券时报：https://www.stcn.com/
-- 界面新闻：https://www.jiemian.com/
 
 ### 科技新闻
 - 36氪：https://www.36kr.com/
 - 腾讯科技：https://tech.qq.com/
 - 钛媒体：https://www.tmtpost.com/
 - 极客公园：https://www.geekpark.net/
-- 网易科技：https://tech.163.com/
-- 搜狐科技：https://it.sohu.com/
 
 ### 国际新闻
 - Reuters：https://www.reuters.com/
 - BBC：https://www.bbc.com/news
 - CNN：https://www.cnn.com/
 - AP News：https://apnews.com/
-- Al Jazeera：https://www.aljazeera.com/
+- 纽约时报：https://www.nytimes.com/
 
 ### 娱乐新闻
 - 新浪娱乐：https://ent.sina.com.cn/
