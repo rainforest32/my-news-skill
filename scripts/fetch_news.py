@@ -66,7 +66,7 @@ def get_real_browser_html(url):
         page = context.new_page()
         
         # 访问网站，等待网络空闲（完全加载渲染）
-        page.goto(url, wait_until="networkidle")
+        page.goto(url, wait_until="networkidle", timeout=60000)
         
         # 获取渲染后完整HTML
         html = page.content()
