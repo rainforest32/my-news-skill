@@ -1,189 +1,170 @@
 ---
 name: my-news-skill
-description: "轻量新闻查询技能。Use when user asks for 最新新闻、新闻摘要、今日热点、财经新闻、科技新闻、国内新闻、国际新闻、娱乐新闻、微博热点、小红书热点、知乎热点、AI 新闻，或某个关键词的最新报道；自动选择合适信源并输出带标题、来源、发布时间、链接和核心摘要的简体中文结果。"
-version: 1.0.0
+description: "新闻抓取与摘要技能。Use when user asks for 最新新闻、新闻摘要、今日热点、财经新闻、科技新闻、国内新闻、国际新闻、微博热点、小红书热点、知乎热点、AI 新闻、HuggingFace 论文、Hacker News、GitHub Trending，或某个关键词的最新报道；通过本地 fetch_news.py 脚本抓取真实数据，并输出带标题、来源、发布时间、链接和核心摘要的简体中文结果。"
+version: 2.0.0
 author: 王小桥
 license: MIT
 metadata:
   hermes:
-    tags: ["新闻查询", "最新新闻", "新闻摘要", "综合新闻", "热点新闻", "财经新闻", "科技新闻", "国内新闻", "国际新闻", "娱乐新闻", "微博热点", "小红书热点", "知乎热点", "AI新闻", "关键词新闻"]
+    tags: ["新闻查询", "最新新闻", "新闻摘要", "综合新闻", "热点新闻", "财经新闻", "科技新闻", "国内新闻", "国际新闻", "微博热点", "小红书热点", "知乎热点", "AI新闻", "HuggingFace", "HackerNews", "GitHub Trending"]
 ---
 
 # 新闻查询技能
 
 ## 定位
-这是一个轻量新闻查询 skill，默认依赖 Agent 自带的联网检索、网页读取和摘要能力完成任务，不依赖本地 Python 抓取脚本、报告目录或额外安装步骤。
+本 skill 完全依赖本地脚本 `scripts/fetch_news.py` 抓取真实实时数据，不使用 Agent 内置联网检索。每次执行时必须先运行脚本获取 JSON，再对结果做摘要整理后输出。
 
-## 目标
-根据用户输入的新闻类型、关键词和时间偏好，优先检索近 24 小时内的可信新闻内容，并输出简洁、可阅读、可追溯的中文摘要。
+脚本路径：`scripts/fetch_news.py`（相对于本 skill 根目录）
+运行方式：`python3 scripts/fetch_news.py --source <source_name>`
+工作目录：本 skill 根目录（SKILL.md 所在目录）
+输出格式：JSON 数组，每条包含 `title`、`url` 及各信源特有字段。
 
-适用场景包括：
-- 查询某个主题的最新新闻
-- 汇总某类新闻的今日动态
-- 查看微博、知乎、小红书等平台热点
-- 获取 AI、科技、财经、国内、国际、娱乐等垂类快报
-
-## 前置条件
-1. 网络通畅，可正常访问互联网。
-2. Agent 可正常调用 `web_search` 或等价联网检索能力。
-3. Agent 可读取新闻落地页或搜索结果摘要，用于提取来源、发布时间和核心内容。
-
-## 通用工作流
-
-### 第一步：识别查询意图
-先判断用户属于哪一类请求：
-- 明确新闻类型，例如“财经新闻”“AI 新闻”“微博热点”
-- 明确关键词，例如“OpenAI 最新新闻”“中美关税相关新闻”
-- 混合请求，例如“给我看今天 AI 和科技圈最热的 10 条消息”
-
-如果用户明确指定来源、地区、语言或时间范围，优先服从用户约束；否则使用下表中的默认信源策略。
-
-### 第二步：选择信源并检索
-根据新闻类型优先选择默认信源，必要时使用 2 到 3 个来源交叉验证，避免单一来源遗漏或误报。
-
-检索时优先满足以下原则：
-- 先看近 24 小时内容，再补充近 48 小时内高价值内容
-- 优先选择带明确发布时间的结果
-- 同一事件尽量合并，避免重复输出多个标题党版本
-
-### 第三步：按统一模板输出
-将结果整理为简体中文摘要，至少包含标题、来源、发布时间、链接和核心内容。若用户请求“简报”“汇总”“摘要”，默认输出精简版；若用户请求“详细分析”，可在每条新闻后补充背景和影响。
-
-## 新闻类型与默认信源
-
-| 新闻类型 | 默认信源 | 回退信源 | 检索偏好 |
-|---|---|---|---|
-| 实时新闻 | 腾讯新闻、网易新闻、搜狐新闻 | 新浪新闻、澎湃新闻、Google News | 按“最新”“刚刚”“今天”排序，优先近 24 小时 |
-| 综合新闻 | 腾讯新闻、网易新闻、澎湃新闻 | 新浪新闻、搜狐新闻、人民网 | 覆盖国内外多领域，优先去重后汇总 |
-| 热点新闻 | 微博热搜、腾讯新闻热点、百度热搜新闻页 | 网易新闻热点、搜狐新闻热点 | 优先热榜和正在讨论的话题 |
-| 财经新闻 | 华尔街见闻、第一财经、财联社 | 新浪财经、证券时报、界面新闻 | 优先市场异动、政策、公司财报 |
-| 科技新闻 | 36氪、腾讯科技、钛媒体 | 极客公园、网易科技、搜狐科技 | 优先产品发布、行业趋势、投融资 |
-| 国内新闻 | 人民网、新华网、澎湃新闻 | 央视新闻、中国新闻网、腾讯新闻 | 优先权威媒体和明确时间戳 |
-| 国际新闻 | Reuters、BBC、CNN | AP News、Al Jazeera、Google News | 优先国际主流媒体，补充中文二次报道 |
-| 娱乐新闻 | 新浪娱乐、腾讯娱乐、网易娱乐 | 搜狐娱乐、凤凰网娱乐 | 优先明星动态、影视发布、票房热点 |
-| 微博热点 | 微博热搜 | 腾讯新闻热点、百度热搜 | 优先榜单词条和热度描述 |
-| 小红书热点 | rebang.today等第三方热榜平台 | 搜索结果页、第三方聚合报道 | 优先话题词和平台热帖概览 |
-| 知乎热点 | 知乎热榜 | 搜索结果页、第三方聚合报道 | 优先问题标题、热度和核心争议点 |
-| AI 新闻 | Hugging Face、OpenAI Blog、Anthropic News、36氪 AI | Hacker News、GitHub Trending、科技媒体 AI 专栏 | 优先模型发布、产品更新、融资和政策 |
-| 关键词新闻 | 与关键词最相关的主流新闻站点 | Google News、Bing News、综合媒体搜索结果 | 将关键词与“最新”“今日”“breaking”组合检索 |
-
-## 参考的新闻网址
-
-### 综合与实时新闻
-- 腾讯新闻：https://news.qq.com/
-- 网易新闻：https://news.163.com/
-- 搜狐新闻：https://news.sohu.com/
-- 澎湃新闻：https://www.thepaper.cn/
-- Google News：https://news.google.com/
-
-### 财经新闻
-- 华尔街见闻：https://wallstreetcn.com/
-- 第一财经：https://www.yicai.com/
-- 财联社：https://www.cls.cn/
-- 证券时报：https://www.stcn.com/
-
-### 科技新闻
-- 36氪：https://www.36kr.com/
-- 腾讯科技：https://tech.qq.com/
-- 钛媒体：https://www.tmtpost.com/
-- 极客公园：https://www.geekpark.net/
-
-### 国际新闻
-- Reuters：https://www.reuters.com/
-- BBC：https://www.bbc.com/news
-- CNN：https://www.cnn.com/
-- AP News：https://apnews.com/
-- 纽约时报：https://www.nytimes.com/
-
-### 娱乐新闻
-- 新浪娱乐：https://ent.sina.com.cn/
-- 腾讯娱乐：https://ent.qq.com/
-- 网易娱乐：https://ent.163.com/
-- 搜狐娱乐：https://yule.sohu.com/
-- 凤凰网娱乐：https://ent.ifeng.com/
+## 信源总览
 
 ### 热点与社交平台
-- 微博热搜：https://s.weibo.com/top/summary
-- 知乎热榜：https://www.zhihu.com/hot
-- 小红书热榜：https://rebang.today/?tab=xiaohongshu（官方https://www.xiaohongshu.com/没有提供热榜功能）
+| source_name | 说明 | 关键输出字段 |
+|---|---|---|
+| `xiaohongshu_hot` | 小红书热榜（rebang.today） | title, url, hot |
+| `zhihu_hot` | 知乎热榜 | title, url, hot, excerpt |
+| `weibo_hot` | 微博热搜 | title, url, hot, category |
+
+### 综合与实时新闻
+| source_name | 说明 | 关键输出字段 |
+|---|---|---|
+| `tencent_news` | 腾讯新闻 | title, url, time, source |
+| `163_news` | 网易新闻 | title, url, time, source |
+| `sohu_news` | 搜狐新闻 | title, url, time, source |
+| `thepaper` | 澎湃新闻 | title, url, time, source |
+| `google_news` | Google News | title, url, source, time |
+
+### 财经新闻
+| source_name | 说明 | 关键输出字段 |
+|---|---|---|
+| `wallstreetcn` | 华尔街见闻 | title, url, time |
+| `yicai` | 第一财经 | title, url, time |
+| `cls` | 财联社 | title, url, time |
+| `stcn` | 证券时报 | title, url, time |
+
+### 科技新闻
+| source_name | 说明 | 关键输出字段 |
+|---|---|---|
+| `36kr` | 36氪 | title, url, time, author |
+| `tencent_tech` | 腾讯科技 | title, url, time |
+| `tmtpost` | 钛媒体 | title, url, time, author, description |
+| `geekpark` | 极客公园 | title, url, time, category, author |
+
+### 国际新闻
+| source_name | 说明 | 关键输出字段 |
+|---|---|---|
+| `reuters` | 路透社（via Google News RSS） | title, url, source, time |
+| `bbc` | BBC World | title, url, description, time |
+| `cnn` | CNN World | title, url |
+| `apnews` | AP News | title, url, description, time |
+| `nytimes` | 纽约时报 World RSS | title, url, description, category, time |
 
 ### AI 与开发者资讯
-- Hugging Face Papers：https://huggingface.co/papers
-- Hacker News：https://news.ycombinator.com/
-- GitHub Trending：https://github.com/trending
+| source_name | 说明 | 关键输出字段 |
+|---|---|---|
+| `hf_papers` | Hugging Face Papers 今日列表 | title, url, upvotes, submitter |
+| `hackernews` | Hacker News 首页 | rank, title, url, points, user, age, comments |
+| `github_trending` | GitHub Trending（本周） | name, url, description, language, stars, stars_period |
 
+## 新闻类型 → 推荐信源映射
 
-## 统一输出模板
+| 用户请求类型 | 首选信源 | 备用信源 |
+|---|---|---|
+| 微博热点 | `weibo_hot` | - |
+| 小红书热点 | `xiaohongshu_hot` | — |
+| 知乎热点 | `zhihu_hot` | — |
+| 综合国内新闻 | `tencent_news`, `thepaper`, `google_news` | `163_news`, `sohu_news` |
+| 财经新闻 | `wallstreetcn`, `cls`, `yicai` | `stcn` |
+| 科技新闻 | `36kr`, `geekpark`, `tmtpost`, `tencent_tech` | - |
+| 国际新闻 | `reuters`, `bbc`, `nytimes` | `cnn`, `apnews` |
+| AI 论文 | `hf_papers` | `hackernews` |
+| AI / 开发者动态 | `hackernews`, `hf_papers`, `github_trending`, `36kr` | - |
+| GitHub 热门项目 | `github_trending` | `hackernews` |
 
-### 普通新闻模板
+## 工作流
 
-```markdown
-#### 1. [新闻标题](原始链接)
-- 来源：媒体名
-- 发布时间：YYYY-MM-DD HH:MM 或来源页面原始时间描述
-- 核心摘要：用 1 到 3 句话概括发生了什么、涉及谁、为什么值得关注。
+### 第一步：识别查询意图
+判断用户属于哪一类请求，并从上表选出信源列表。若用户明确指定信源名，直接使用。
+
+### 第二步：运行脚本抓取
+对每个信源执行命令（工作目录为本 skill 根目录）：
+
+```bash
+python3 scripts/fetch_news.py --source <source_name>
 ```
 
-### 热点榜单类模板
+- 首选信源的多个候选顺序执行，其中某一个失败时可继续执行，如果所有首选信源失败才切换到备用信源顺序执行。
+- 若脚本返回非零退出码或 JSON 为空数组，认为该信源抓取失败，记录失败原因并切换到下一个候选信源。
+- 若某信源需要 Playwright（`get_real_browser_html`），那尝试安装相关环境后重试一次。
 
-```markdown
-#### 1. 热点词条 / 话题标题
-- 来源：微博热搜 / 知乎热榜 / 小红书热点
-- 发布时间：榜单抓取时间或页面展示时间
-- 热度：若页面有热度值、排名或热词标签，则保留
-- 核心摘要：说明该词条指向的事件及其讨论焦点。
-- 链接：原始榜单链接或词条链接
+### 第三步：解析 JSON 并整理
+脚本输出为标准 JSON 数组，逐条读取后：
+- 去重：标题相似度高（> 80%）的多条合并为一条，合并来源字段。
+- 排序：有时间字段时按时间倒序；热榜类按rank升序，如果有热度值也可按照热度值降序。
+- 截取：用户未指定数量时默认取前 10 条；用户指定则按指定数量。
+
+### 第四步：输出中文摘要
+
+#### 普通新闻模板
+```
+#### N. [标题](url)
+- 来源：媒体名 / source_name
+- 时间：来自 time 字段，或标注"时间未明确"
+- 摘要：1–2 句核心内容（从 description/excerpt 字段提取，不足时根据标题推断，禁止编造）
+```
+
+#### 热榜类模板
+```
+#### N. 标题 — 热度 hot值
+- 来源：weibo_hot / zhihu_hot / xiaohongshu_hot
+- 链接：url
+- 摘要：该词条讨论的事件与争议焦点（从 excerpt 字段提取，无则根据标题描述）
+```
+
+#### Hacker News 模板
+```
+#### N. [标题](url)  ↑rank
+- 分数：points 分 | 作者：user | 发布：age
+- 评论：comments
+```
+
+#### HuggingFace Papers 模板
+```
+#### N. [标题](url)
+- 上票：upvotes | 提交者：submitter
+- 摘要：根据标题推断研究方向（不编造摘要内容）
+```
+
+#### GitHub Trending 模板
+```
+#### N. [name](url)  language
+- 描述：description
+- ⭐ stars（stars_period）
 ```
 
 ## 严格规则
-1. 所有输出默认使用简体中文，专有名词可保留英文原文。
-2. 每条结果都必须尽量给出发布时间；如果无法确认，明确标记为“时间未明确”，不要猜测。
-3. 时间字段优先使用完整格式 `YYYY-MM-DD HH:MM`；如果来源只提供“今天”“刚刚”“1 小时前”，可保留原样，但不要自行换算成不确定的绝对时间。
-4. 不得编造新闻、链接、来源、热度值、人物观点或事件因果关系。
-5. 同一事件在多个来源重复出现时，优先保留最权威或信息最完整的一条，其余来源只在摘要中合并引用。
-6. 用户要求“最新”时，默认优先近 24 小时内容；如果结果明显不足，可补充近 48 小时内高价值内容，并明确说明是补充项。
-7. 用户只给宽泛类别时，默认返回 5 到 10 条；用户给出明确数量时，尽量按指定数量输出。
-8. 对于平台热点类内容，优先描述“讨论的是什么”，不要把热词直接当成完整事实。
+1. 所有输出默认使用简体中文，专有名词保留英文原文。
+2. 不得编造新闻、链接、热度值、人物观点或事件因果关系。
+3. 时间字段优先完整格式 `YYYY-MM-DD HH:MM`；若来源只有"1 小时前"等相对时间，保留原样，不换算。
+4. 无法确认时间时，明确标注"时间未明确"，不猜测。
+5. 脚本执行失败时告知用户哪个信源失败及原因，并切换备用，不静默跳过。
+6. 禁止在未运行脚本的情况下凭记忆或 Agent 自身知识伪造"抓取结果"。
 
-## 失败与兜底策略
-
-### 运行与抓取时的实战经验（来自最近会话）
-下面是一次真实会话中总结出的可复用经验和注意事项，建议合并进该 skill 的操作指南，便于后续自动化检索更稳健：
-
-- 优先使用已保存的抓取/存档目录：所有中间文件和最终产物应写入 ~/.hermes/work 下的任务子目录（例如：~/.hermes/work/news_briefings/YYYY-MM-DD_...）。这是用户长期偏好，有利于审计与回放。
-- 页面与 API 抓取可出现被动阻断：当常用源（例如百度）出现验证码或访问拦截时，自动切换到可用备选（Bing/Google/权威站点二次报道）；避免在未经用户许可下安装代理或浏览器二进制。
-- Playwright/Chromium 依赖须事先征得用户确认：某些来源需要无头浏览器才能稳定抓取（动态渲染、JS 加载、反爬保护）。skill 的运行说明里应明确注明：若脚本需要 Playwright/Chromium，必须先询问用户是否允许安装系统/用户级浏览器二进制。
-- 处理大文件与分块读取：当读取生成的抓取文件（如 unified JSON）超出 read_file 的安全/行数限制时，应使用 read_file(offset, limit) 分块读取并在内存中拼接或增量解析，避免一次性载入过大内容导致失败。
-- 容错解析 JSON：抓取结果常含控制字符、未关闭字符串或中间截断。实现时应先尝试严格 JSON 解析，失败后尝试：去除多余尾逗号、按对象边界分块解析、基于正则抽取关键字段（title/source/url/time/content）作为兜底方案。
-- 文本抽取优先级与去重：同一事件可能在多源重复。按“权威优先 > 信息完整度 > 时间新旧”排序，输出前做去重（相同/近似标题合并），并在摘要中合并来源说明。
-- 兑现用户偏好（格式与交付）：默认以简体中文输出可读 chat 消息（不直接发送文件）。如果用户要求存档，才把文件保存在 ~/.hermes/work 并返回路径。
-- 崩溃/超时与重试策略：脚本超时或 navigation 错误（ERR_BLOCKED_BY_CLIENT / CERT_COMMON_NAME_INVALID）时，应重试 1 次并换源；若仍失败，记录错误并给用户可理解的失败理由和可选替代（例如使用回退站点或人工确认）。
-- 日志与可复现性：每次抓取在工作目录写入一个 metadata.json（source list, timestamps, commands used, exit codes），便于审计与问题复现。
-
-### 验证步骤（建议加入 skill 的执行流程）
-1. 预检：对目标源做 quick HEAD/GET 检查，确认可访问性（或返回已知错误类型）。
-2. 读取/抓取：若用 read_file 读取历史抓取，请先用 limit=300 的分块读取查看结构，必要时再拼接完整文件并解析。
-3. 解析与兜底：优先严谨 JSON -> 修正常见问题 -> 正则/字段抽取兜底。
-4. 去重合并：按事件聚合相似标题并合并来源列表。
-5. 输出并存档：按用户偏好输出到聊天，存档到 ~/.hermes/work 并写入 metadata.json。
-
-（将以上条目并入 Skill 的失败与兜底策略部分，便于以后自动化执行时遵守这些经验）
-
-## 失败与兜底策略
-1. 默认信源打不开或无法读取时，立即切换到同类回退信源，不中断任务。
-2. 若平台站内页面不可稳定访问，例如小红书或知乎部分页面不可读，优先使用公开热榜页、搜索结果页或权威媒体的二次报道。
-3. 若多个来源对同一事件的时间、数字或结论存在冲突，优先采用权威来源，并在摘要中简要说明存在版本差异。
-4. 若用户没有给关键词，只说“看看今天有什么新闻”，默认按综合新闻处理，并尽量覆盖国内、国际、财经和科技四类。
-5. 若检索结果不足 3 条，明确说明覆盖不足，并展示已找到的结果，不要为了凑数扩写或虚构。
-6. 若用户要求“只看某来源”或“不要某平台”，覆盖默认策略，严格按用户要求执行。
+## 兜底策略
+1. 脚本超时或 JSON 为空 → 切换同类备用信源，重试一次。
+2. Playwright timeout（networkidle 30 s 超时）→ 切换可用的 urllib 信源或告知用户该信源暂不可用。
+3. 多信源同一事件冲突 → 采用权威来源，摘要中注明存在版本差异。
+4. 用户只说"看看今天有什么新闻" → 默认运行 `tencent_news` + `reuters` + `36kr`，覆盖国内、国际、科技三类。
+5. 结果不足 3 条 → 明确说明覆盖不足，展示已有结果，不凑数虚构。
 
 ## 示例触发请求
 - 帮我看一下今天的 AI 新闻。
 - 总结一下最新财经新闻，重点看政策和市场异动。
-- 查一下 OpenAI 的最新消息。
 - 给我一份微博热点摘要。
+- 看看今天 HuggingFace 有哪些热门论文。
+- 看看 GitHub 本周最热项目。
+- 看看今天 Hacker News 最热的 10 条。
 - 看看今天国内和国际新闻各有什么大事。
-- 汇总一下最近 24 小时的科技新闻。
-
-## 输出预期
-执行该 skill 时，应优先给出可追溯、时间明确、来源清晰的新闻摘要，而不是泛泛而谈的背景介绍。如果用户后续要求“展开讲讲”，再基于已检索到的结果做延伸说明。
