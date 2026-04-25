@@ -413,13 +413,65 @@ def fetch_thepaper(options):
 
     print(json.dumps(items, ensure_ascii=False, indent=2))
 
+def fetch_google_news(options):
+    # https://news.google.com/topics/CAAqKggKIiRDQkFTRlFvSUwyMHZNRFZxYUdjU0JYcG9MVU5PR2dKRFRpZ0FQAQ?hl=zh-CN&gl=CN&ceid=CN%3Azh-Hans
+    import json
+    from bs4 import BeautifulSoup
+
+    url = 'https://news.google.com/topics/CAAqKggKIiRDQkFTRlFvSUwyMHZNRFZxYUdjU0JYcG9MVU5PR2dKRFRpZ0FQAQ?hl=zh-CN&gl=CN&ceid=CN%3Azh-Hans'
+    html = get_real_browser_html(url)
+    soup = BeautifulSoup(html, 'html.parser')
+    base = 'https://news.google.com/topics/'
+
+    items = []
+    seen = set()
+
+    def extract_item(container, section):
+        a = None
+        for x in container.select('a[href*="./read/"]'):
+            if x.get_text(strip=True):
+                a = x
+                break
+        if not a:
+            return
+        href = a.get('href', '')
+        if href.startswith('./'):
+            href = base + href[2:]
+        if href in seen:
+            return
+        title = a.get_text(strip=True)
+        if not title:
+            return
+        seen.add(href)
+        source_node = container.select_one('.vr1PYe')
+        time_node = container.select_one('time')
+        items.append({
+            'rank': len(items) + 1,
+            'title': title,
+            'url': href,
+            'source_name': source_node.get_text(strip=True) if source_node else '',
+            'time': time_node.get('datetime', '') if time_node else '',
+            'source': 'Google新闻',
+            'section': section,
+        })
+
+    # 独立卡片
+    for card in soup.select('div.IL9Cne'):
+        extract_item(card, '要闻')
+
+    # 分组新闻（每组取首条）
+    for grp in soup.select('div.W8yrY'):
+        extract_item(grp, '要闻')
+
+    print(json.dumps(items, ensure_ascii=False, indent=2))
+
 
 def main():
     options = usage()
     if options.source == '':
         print('please provide source', file=sys.stderr)
         sys.exit(-1)
-    support_sources = set(['xiaohongshu_hot', 'zhihu_hot', 'weibo_hot', 'tencent_news', '163_news', 'sohu_news', 'thepaper'])
+    support_sources = set(['xiaohongshu_hot', 'zhihu_hot', 'weibo_hot', 'tencent_news', '163_news', 'sohu_news', 'thepaper', 'google_news'])
     if options.source not in support_sources:
         print('unsupported source: %s' % options.source, file=sys.stderr)
         sys.exit(-1)
