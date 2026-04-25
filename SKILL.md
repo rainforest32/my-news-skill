@@ -71,17 +71,17 @@ metadata:
 
 ## 新闻类型 → 推荐信源映射
 
-| 用户请求类型 | 首选信源 | 备用信源 |
-|---|---|---|
-| 微博热点 | `weibo_hot` | - |
-| 小红书热点 | `xiaohongshu_hot` | — |
-| 知乎热点 | `zhihu_hot` | — |
-| 综合国内新闻 | `tencent_news`, `thepaper`, `google_news` | `163_news`, `sohu_news` |
-| 财经新闻 | `wallstreetcn`, `cls`, `yicai` | `stcn` |
-| 科技新闻 | `36kr`, `geekpark`, `tmtpost`, `tencent_tech` | - |
-| 国际新闻 | `reuters`, `bbc`, `nytimes` | `cnn`, `apnews` |
-| AI新闻 | `hackernews`, `36kr`,  | `hf_papers`,  `github_trending` |
-| GitHub 热门项目 | `github_trending` | `hackernews` |
+| 用户请求类型 | 首选信源 | 备用信源 | 额外处理 |
+|---|---|---| --- |
+| 微博热点 | `weibo_hot` | - | - |
+| 小红书热点 | `xiaohongshu_hot` | — | — |
+| 知乎热点 | `zhihu_hot` | — | — |
+| 综合国内新闻 | `tencent_news`, `thepaper`, `google_news` | `163_news`, `sohu_news` | — |
+| 财经新闻 | `wallstreetcn`, `cls`, `yicai` | `stcn` | — |
+| 科技新闻 | `36kr`, `geekpark`, `tmtpost`, `tencent_tech` | - | — |
+| 国际新闻 | `reuters`, `bbc`, `nytimes` | `cnn`, `apnews` | — |
+| AI新闻 | `hackernews`, `36kr`,  | `hf_papers`,  `github_trending` | 筛选出跟AI相关的内容 |
+| GitHub 热门项目 | `github_trending` | - | — |
 
 ## 工作流
 
