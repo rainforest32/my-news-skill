@@ -1067,38 +1067,115 @@ def fetch_nytimes(options):
 # https://huggingface.co/papers
 def fetch_hf_papers(options):
     import json
+    import urllib.request
     from bs4 import BeautifulSoup
 
-    html = get_real_browser_html('https://huggingface.co/papers')
+    ua = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+    req = urllib.request.Request('https://huggingface.co/papers', headers={'User-Agent': ua})
+    with urllib.request.urlopen(req, timeout=15) as r:
+        html = r.read().decode('utf-8', errors='replace')
     soup = BeautifulSoup(html, 'html.parser')
+    items = []
+    for art in soup.select('article'):
+        title_a = art.select_one('h3 a')
+        if not title_a:
+            continue
+        title = title_a.get_text(strip=True)
+        href = title_a.get('href', '')
+        url = 'https://huggingface.co' + href if href.startswith('/') else href
+        upvotes = ''
+        for div in art.find_all('div'):
+            t = div.get_text(strip=True)
+            if t.isdigit() and len(t) <= 4:
+                upvotes = t
+                break
+        sub_div = art.select_one('div.shadow-xs')
+        submitter = sub_div.get_text(strip=True).replace('Submitted by', '').strip() if sub_div else ''
+        items.append({'title': title, 'url': url, 'upvotes': upvotes, 'submitter': submitter})
+    print(json.dumps(items, ensure_ascii=False, indent=2))
 
 # Hacker News
 # https://news.ycombinator.com/
 def fetch_hackernews(options):
     import json
+    import urllib.request
     from bs4 import BeautifulSoup
 
-    html = get_real_browser_html('https://news.ycombinator.com/')
+    ua = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+    req = urllib.request.Request('https://news.ycombinator.com/', headers={'User-Agent': ua})
+    with urllib.request.urlopen(req, timeout=15) as r:
+        html = r.read().decode('utf-8', errors='replace')
     soup = BeautifulSoup(html, 'html.parser')
+    items = []
+    for row in soup.select('tr.athing'):
+        title_span = row.select_one('span.titleline > a')
+        if not title_span:
+            continue
+        title = title_span.get_text(strip=True)
+        url = title_span.get('href', '')
+        rank_span = row.select_one('span.rank')
+        rank = rank_span.get_text(strip=True).rstrip('.') if rank_span else ''
+        sub_row = row.find_next_sibling('tr')
+        points = ''
+        user = ''
+        age = ''
+        comments = ''
+        if sub_row:
+            score_span = sub_row.select_one('span.score')
+            if score_span:
+                points = score_span.get_text(strip=True).replace(' points', '').replace(' point', '')
+            user_a = sub_row.select_one('a.hnuser')
+            if user_a:
+                user = user_a.get_text(strip=True)
+            age_span = sub_row.select_one('span.age a')
+            if age_span:
+                age = age_span.get_text(strip=True)
+            comment_links = sub_row.select('a[href^="item?id="]')
+            for cl in comment_links:
+                t = cl.get_text(strip=True)
+                if 'comment' in t or 'discuss' in t:
+                    comments = t
+                    break
+        items.append({'rank': rank, 'title': title, 'url': url, 'points': points, 'user': user, 'age': age, 'comments': comments})
+    print(json.dumps(items, ensure_ascii=False, indent=2))
 
 # github trending
 # https://github.com/trending?since=weekly
 def fetch_github_trending(options):
     import json
+    import urllib.request
     from bs4 import BeautifulSoup
 
-    html = get_real_browser_html('https://github.com/trending?since=weekly')
+    ua = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+    req = urllib.request.Request('https://github.com/trending?since=weekly', headers={'User-Agent': ua})
+    with urllib.request.urlopen(req, timeout=15) as r:
+        html = r.read().decode('utf-8', errors='replace')
     soup = BeautifulSoup(html, 'html.parser')
-
-
-
+    items = []
+    for repo in soup.select('article.Box-row'):
+        h2 = repo.select_one('h2.h3 a')
+        if not h2:
+            continue
+        repo_path = h2.get('href', '').strip().lstrip('/')
+        url = 'https://github.com/' + repo_path
+        full_name = h2.get_text(strip=True).replace(' ', '').replace('\n', '')
+        desc_el = repo.select_one('p.col-9')
+        description = desc_el.get_text(strip=True) if desc_el else ''
+        lang_el = repo.select_one('span[itemprop="programmingLanguage"]')
+        language = lang_el.get_text(strip=True) if lang_el else ''
+        stars_el = repo.select_one('a[href$="/stargazers"]')
+        stars = stars_el.get_text(strip=True).replace(',', '') if stars_el else ''
+        period_el = repo.select_one('span.d-inline-block.float-sm-right')
+        stars_period = period_el.get_text(strip=True) if period_el else ''
+        items.append({'name': full_name, 'url': url, 'description': description, 'language': language, 'stars': stars, 'stars_period': stars_period})
+    print(json.dumps(items, ensure_ascii=False, indent=2))
 
 def main():
     options = usage()
     if options.source == '':
         print('please provide source', file=sys.stderr)
         sys.exit(-1)
-    support_sources = set(['xiaohongshu_hot', 'zhihu_hot', 'weibo_hot', 'tencent_news', '163_news', 'sohu_news', 'thepaper', 'google_news', 'wallstreetcn', 'yicai', 'cls', 'stcn', '36kr', 'tencent_tech', 'tmtpost', 'geekpark', 'reuters', 'bbc', 'cnn', 'apnews', 'nytimes'])
+    support_sources = set(['xiaohongshu_hot', 'zhihu_hot', 'weibo_hot', 'tencent_news', '163_news', 'sohu_news', 'thepaper', 'google_news', 'wallstreetcn', 'yicai', 'cls', 'stcn', '36kr', 'tencent_tech', 'tmtpost', 'geekpark', 'reuters', 'bbc', 'cnn', 'apnews', 'nytimes', 'hf_papers', 'hackernews', 'github_trending'])
     if options.source not in support_sources:
         print('unsupported source: %s' % options.source, file=sys.stderr)
         sys.exit(-1)
