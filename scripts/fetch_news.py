@@ -65,8 +65,13 @@ def get_real_browser_html(url):
         )
         page = context.new_page()
         
+        from playwright._impl._errors import TimeoutError
         # 访问网站，等待网络空闲（完全加载渲染）
-        page.goto(url, wait_until="networkidle", timeout=60000)
+        try:
+            page.goto(url, wait_until="networkidle", timeout=30000)
+        except TimeoutError:
+            print("页面加载超时", file=sys.stderr)
+            pass
         
         # 获取渲染后完整HTML
         html = page.content()
